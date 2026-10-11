@@ -194,6 +194,39 @@ export XIAOHEIHE_COOKIE_PATH=/path/to/cookies_b.json
 
 未设置该变量时，行为与原来完全一致（使用默认的 `data/cookies.json`）。在 MCP 客户端（如 VSCode、WorkBuddy）中，可以为不同账号配置多个连接器条目，各自注入不同的 `XIAOHEIHE_COOKIE_PATH`，实现同一客户端内多账号并存。
 
+#### 多账户切换
+
+服务启动时会读取 `XIAOHEIHE_COOKIE_PATH`，一个运行中的服务实例对应一个 Cookie 文件。为不同账号指定不同的 Cookie 路径，即可实现账号隔离：
+
+- **stdio 模式**：为每个 MCP 连接器配置独立的 `env`，每个连接器会启动一个使用独立 Cookie 文件的服务进程。
+
+  ```json
+  {
+    "servers": {
+      "xiaoheihe-account-a": {
+        "type": "stdio",
+        "command": "D:\\Tools\\XiaoheiheMcpServer\\XiaoheiheMcpServer.Stdio.exe",
+        "args": [],
+        "env": {
+          "XIAOHEIHE_COOKIE_PATH": "D:\\Tools\\XiaoheiheMcpServer\\data\\cookies_account_a.json"
+        }
+      },
+      "xiaoheihe-account-b": {
+        "type": "stdio",
+        "command": "D:\\Tools\\XiaoheiheMcpServer\\XiaoheiheMcpServer.Stdio.exe",
+        "args": [],
+        "env": {
+          "XIAOHEIHE_COOKIE_PATH": "D:\\Tools\\XiaoheiheMcpServer\\data\\cookies_account_b.json"
+        }
+      }
+    }
+  }
+  ```
+
+- **HTTP 模式**：需要为每个账号启动一个独立的 HTTP 服务进程，并设置不同的 Cookie 路径和端口；客户端分别连接对应的 `/mcp` 地址。
+
+切换账号时，选择对应的 MCP 连接器即可。若修改了环境变量或 Cookie 路径，请先重启对应的 MCP 服务；首次使用新的 Cookie 文件时，调用 `interactive_login`（有头模式）或 `get_login_qr_code` 完成登录。不要让多个账号共用同一个 Cookie 文件，否则可能出现账号串用。
+
 
 ## 注意事项
 
