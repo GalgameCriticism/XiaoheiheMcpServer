@@ -20,16 +20,15 @@ builder.Logging.SetMinimumLevel(LogLevel.Warning);
 // 解析命令行参数 - 是否使用无头模式
 var headless = !args.Contains("--no-headless");
 
-// 检查是否首次使用（是否存在 Cookie 文件）
-var dataDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data");
-var cookiePath = Path.Combine(dataDir, "cookies.json");
+// 检查是否首次使用（是否存在 Cookie 文件；支持 XIAOHEIHE_COOKIE_PATH 自定义路径）
+var cookiePath = BrowserBase.ResolveCookiePath();
 var isFirstTime = !File.Exists(cookiePath);
 
 // 首次使用时强制使用有头模式
 if (isFirstTime)
 {
     headless = false;
-    Console.Error.WriteLine("🔔 检测到首次使用，将使用有头模式打开浏览器，请完成登录后后续将自动使用无头模式");
+    Console.Error.WriteLine($"🔔 检测到首次使用（Cookie 路径: {cookiePath}），将使用有头模式打开浏览器，请完成登录后后续将自动使用无头模式");
 }
 
 // 注册服务

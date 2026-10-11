@@ -177,8 +177,22 @@
 
 ## 数据存储
 
-- Cookies 存储在 `data/cookies.json`
+- Cookies 存储在 `data/cookies.json`（默认相对于程序运行目录）
 - 登录后会自动保存 Cookies，下次启动无需重新登录
+
+### 自定义 Cookie 路径（多账号）
+
+通过环境变量 `XIAOHEIHE_COOKIE_PATH` 可将 Cookies 保存到任意路径，用于多账号隔离（每个账号一份 Cookie 文件）：
+
+```bash
+# 账号 A
+export XIAOHEIHE_COOKIE_PATH=/path/to/cookies_a.json
+
+# 账号 B（另一个终端 / 另一个 MCP 连接器条目）
+export XIAOHEIHE_COOKIE_PATH=/path/to/cookies_b.json
+```
+
+未设置该变量时，行为与原来完全一致（使用默认的 `data/cookies.json`）。在 MCP 客户端（如 VSCode、WorkBuddy）中，可以为不同账号配置多个连接器条目，各自注入不同的 `XIAOHEIHE_COOKIE_PATH`，实现同一客户端内多账号并存。
 
 
 ## 注意事项
