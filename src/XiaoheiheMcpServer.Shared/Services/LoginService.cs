@@ -34,13 +34,10 @@ public class LoginService : BrowserBase
             await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
             await Task.Delay(400);
 
-            // 查找用户信息元素 p.user-box__username
-            var userElement = await _page.QuerySelectorAsync("p.user-box__username");
-            
-            if (userElement != null)
+            var username = await FindLoggedInUsernameAsync();
+
+            if (!string.IsNullOrWhiteSpace(username))
             {
-                var username = await userElement.TextContentAsync();
-                username = (username ?? "xiaoheihe-user").Trim();
                 _logger.LogInformation("已登录，用户: {Username}", username);
                 return new LoginStatus
                 {
@@ -102,15 +99,14 @@ public class LoginService : BrowserBase
                 // 保存 Cookie
                 await SaveCookiesAsync();
                 
-                // 获取用户信息
+                // 获取用户信息。新版首页不再使用 p.user-box__username，统一走兼容选择器。
                 await Task.Delay(800); // 等待页面稳定
-                var userElement = await _page.QuerySelectorAsync("p.user-box__username");
-                var username = userElement is not null ? await userElement.TextContentAsync() : null;
+                var username = await FindLoggedInUsernameAsync();
 
                 return new LoginStatus
                 {
                     IsLoggedIn = true,
-                    Username = username?.Trim() ?? "xiaoheihe-user",
+                    Username = username ?? "xiaoheihe-user",
                     Message = "登录成功！Cookie 已保存，后续操作将自动使用此登录状态"
                 };
             }
@@ -133,6 +129,73 @@ public class LoginService : BrowserBase
                 Message = $"交互式登录失败: {ex.Message}"
             };
         }
+    }
+
+    /// <summary>
+    /// 从当前页面的顶部导航、用户页和文章作者区域读取登录用户。
+    /// 小黑盒前端更新后，旧的 p.user-box__username 选择器可能不存在；
+    /// 必须以当前页面实际渲染的账号元素为准，避免把已登录状态误判为未登录。
+    /// </summary>
+    private async Task<string?> FindLoggedInUsernameAsync()
+    {
+        if (_page is null)
+        {
+            return null;
+        }
+
+        var selectors = new[]
+        {
+            "p.user-box__username",       // 旧版首页
+            ".nav-user-popover-name",     // 当前顶部用户菜单
+            ".page-header__username",     // 用户页
+            ".link-user__username"        // 帖子/文章作者
+        };
+
+        foreach (var selector in selectors)
+        {
+            var element = await _page.QuerySelectorAsync(selector);
+            var text = element is null ? null : (await element.TextContentAsync())?.Trim();
+
+            if (!string.IsNullOrWhiteSpace(text) && !string.Equals(text, "登录", StringComparison.Ordinal))
+            {
+                return text;
+            }
+        }
+
+        // 顶部头像即使在用户菜单关闭时也会存在，可作为当前登录账号的兜底标识。
+        var avatar = await _page.QuerySelectorAsync("img.nav-user-avatar");
+        var avatarAlt = avatar is null ? null : (await avatar.GetAttributeAsync("alt"))?.Trim();
+        if (!string.IsNullOrWhiteSpace(avatarAlt))
+        {
+            var avatarName = Regex.Replace(avatarAlt, @"头像$", string.Empty).Trim();
+            if (!string.IsNullOrWhiteSpace(avatarName) && !string.Equals(avatarName, "登录", StringComparison.Ordinal))
+            {
+                return avatarName;
+            }
+        }
+
+        // 菜单可能按需渲染；点击顶部用户入口后再检查一次。
+        var trigger = await _page.QuerySelectorAsync(".nav-user-trigger");
+        if (trigger is not null)
+        {
+            try
+            {
+                await trigger.ClickAsync(new() { Timeout = 2000 });
+                await Task.Delay(150);
+                var popover = await _page.QuerySelectorAsync(".nav-user-popover-name");
+                var text = popover is null ? null : (await popover.TextContentAsync())?.Trim();
+                if (!string.IsNullOrWhiteSpace(text) && !string.Equals(text, "登录", StringComparison.Ordinal))
+                {
+                    return text;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "打开顶部用户菜单读取登录用户名失败");
+            }
+        }
+
+        return null;
     }
 
     /// <summary>
